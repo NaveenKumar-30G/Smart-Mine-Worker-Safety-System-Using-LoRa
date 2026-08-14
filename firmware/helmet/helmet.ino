@@ -126,7 +126,6 @@ void setup() {
     OUTPUT
   );
 
-
   // ---------------- Default State ----------------
 
   // Active LOW buzzer
@@ -150,17 +149,19 @@ void setup() {
     LOW
   );
 
-
   // ---------------- Temperature Sensor ----------------
 
   temperatureSensor.begin();
-
 
   // =================================================
   // ESP-NOW
   // =================================================
 
   WiFi.mode(WIFI_STA);
+
+  // Keep ESP-NOW communication on the same channel
+  // used by the chest unit.
+  WiFi.setChannel(1);
 
   if (
     esp_now_init() != ESP_OK
@@ -179,7 +180,6 @@ void setup() {
     onChestDataReceive
   );
 
-
   // =================================================
   // LoRa
   // =================================================
@@ -189,7 +189,6 @@ void setup() {
     LORA_RST,
     LORA_DIO0
   );
-
 
   if (
     !LoRa.begin(LORA_FREQUENCY)
@@ -203,7 +202,6 @@ void setup() {
       delay(1000);
     }
   }
-
 
   // ---------------- LoRa Configuration ----------------
 
@@ -227,6 +225,8 @@ void setup() {
     LORA_TX_POWER
   );
 
+  // Enable CRC to match the receiver configuration
+  LoRa.enableCrc();
 
   Serial.println();
   Serial.println(
@@ -265,7 +265,6 @@ void loop() {
   unsigned long listenStart =
     millis();
 
-
   while (
     millis() - listenStart < 200
   ) {
@@ -273,18 +272,15 @@ void loop() {
     int packetSize =
       LoRa.parsePacket();
 
-
     if (packetSize) {
 
       String message = "";
-
 
       while (LoRa.available()) {
 
         message +=
           (char)LoRa.read();
       }
-
 
       if (
         message.indexOf(
@@ -304,7 +300,6 @@ void loop() {
     }
   }
 
-
   // ===================================================
   // LOCAL PANIC BUTTON
   // ===================================================
@@ -316,7 +311,6 @@ void loop() {
       ) == LOW
     );
 
-
   // ===================================================
   // FINAL PANIC STATUS
   // ===================================================
@@ -327,7 +321,6 @@ void loop() {
       millis() - panicTimer < 5000
     );
 
-
   // ===================================================
   // VIBRATION ALERT
   // ===================================================
@@ -336,7 +329,6 @@ void loop() {
     VIBRATION_PIN,
     panic ? HIGH : LOW
   );
-
 
   // ===================================================
   // READ ENVIRONMENTAL SENSORS
@@ -347,19 +339,15 @@ void loop() {
       GAS_PIN
     );
 
-
   int flameValue =
     analogRead(
       FLAME_PIN
     );
 
-
   temperatureSensor.requestTemperatures();
-
 
   float temperature =
     temperatureSensor.getTempCByIndex(0);
-
 
   // ===================================================
   // SENSOR ALERT CONDITIONS
@@ -370,12 +358,10 @@ void loop() {
       flameValue < 2000
     );
 
-
   bool gasAlert =
     (
       gasValue > GAS_THRESHOLD
     );
-
 
   bool temperatureAlert =
     (
@@ -383,10 +369,8 @@ void loop() {
       temperature != -127
     );
 
-
   bool fallAlert =
     chestData.fall;
-
 
   bool systemAlert =
     gasAlert ||
@@ -394,7 +378,6 @@ void loop() {
     temperatureAlert ||
     fallAlert ||
     panic;
-
 
   // ===================================================
   // LOCAL ALERT OUTPUTS
@@ -406,18 +389,15 @@ void loop() {
     systemAlert ? LOW : HIGH
   );
 
-
   digitalWrite(
     RED_LED,
     systemAlert ? HIGH : LOW
   );
 
-
   digitalWrite(
     GREEN_LED,
     systemAlert ? LOW : HIGH
   );
-
 
   // ===================================================
   // SEND DATA TO RECEIVER
@@ -430,19 +410,15 @@ void loop() {
     lastSend =
       millis();
 
-
     String packet =
       "ID:01";
-
 
     packet +=
       ",GAS:" +
       String(gasValue);
 
-
     packet +=
       ",FLAME:";
-
 
     packet +=
       (
@@ -451,48 +427,38 @@ void loop() {
         : "SAFE"
       );
 
-
     packet +=
       ",TEMP:";
-
 
     packet +=
       String(temperature);
 
-
     packet +=
       ",BODYTEMP:";
-
 
     packet +=
       String(
         chestData.temp
       );
 
-
     packet +=
       ",HR:";
-
 
     packet +=
       String(
         chestData.heartRate
       );
 
-
     packet +=
       ",SPO2:";
-
 
     packet +=
       String(
         chestData.spo2
       );
 
-
     packet +=
       ",FALL:";
-
 
     packet +=
       (
@@ -501,10 +467,8 @@ void loop() {
         : "NO"
       );
 
-
     packet +=
       ",PANIC:";
-
 
     packet +=
       (
@@ -512,7 +476,6 @@ void loop() {
         ? "YES"
         : "NO"
       );
-
 
     // ---------------- LoRa Transmission ----------------
 
@@ -523,7 +486,6 @@ void loop() {
     );
 
     LoRa.endPacket();
-
 
     // ---------------- Serial Output ----------------
 
